@@ -7,4 +7,4 @@ This analysis takes place within RStudio through the development of code to clea
 
 [Raw Data](https://github.com/mlund2k/Covid-19-R-Analysis/blob/main/COVID19_line_list_data.csv)
 
-Data Credits: [Customer Personality Analysis](https://www.kaggle.com/datasets/sudalairajkumar/novel-corona-virus-2019-dataset)
+Data Credits: [Novel Corona Virus 2019 Dataset](https://www.kaggle.com/datasets/sudalairajkumar/novel-corona-virus-2019-dataset)
