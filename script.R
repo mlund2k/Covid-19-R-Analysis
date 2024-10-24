@@ -1,0 +1,210 @@
+rm(list=ls()) # Removes all previously stored variables
+library(tidyverse)
+
+data <- read.csv("C:/Users/Matthew/Desktop/codes/proj12/COVID19_line_list_data.csv")
+
+head(data)
+
+clean_data <- data %>%
+  select("id","reporting.date","country","gender","age","visiting.Wuhan","from.Wuhan","death","recovered") %>% 
+  mutate(second_hand=as.integer(!(visiting.Wuhan|from.Wuhan))) %>% 
+  mutate(died=as.integer(death!=0)) %>% 
+  mutate(survived=as.integer(recovered!=0)) %>% 
+  select(-"death",-"recovered") %>% 
+  drop_na(reporting.date) %>% 
+  arrange(reporting.date)
+
+head(clean_data)
+
+# 1) Number of cases by gender/country/age container
+
+# 1.1 Number of cases by gender
+
+cbg <- clean_data %>% 
+  select("id","reporting.date","gender") %>% 
+  mutate(day=(as.numeric(as.Date(clean_data$reporting.date))) - 18261) %>% 
+  drop_na(gender) %>% 
+  group_by(day,gender) %>% 
+  summarise(count=n(),.groups='drop') %>% 
+  mutate(code=paste(day,gender))
+
+
+# This Code block fills any discontinuities by adding zeros to missing data
+ref <- data.frame(day = seq(1,59.5,0.5)%/%1,gender = rep(c("female","male"),59),count=rep(0,118)) %>% 
+  mutate(code=paste(day,gender)) # Create a reference vector of zeros for each date
+plot_cbg <- rbind(cbg,ref)[!duplicated(rbind(cbg,ref)$code), ] %>% 
+  arrange(day,gender) %>% 
+  select(-code) # combine actual data with reference data and remove duplicates
+
+ggplot(plot_cbg,aes(x=day,y=count,group=factor(gender))) +
+  geom_line(aes(color=gender, linewidth=gender)) +
+  scale_color_manual(values=c("magenta","blue")) +
+  scale_linewidth_manual(values=c(1.5,1.5)) +
+  theme(axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size=12),
+        axis.title.x = element_text(size=12),
+        axis.title.y = element_text(size=12),
+        title = element_text(size = 18, face = "bold"),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        legend.position = "inside",
+        legend.position.inside = c(0.1,0.8),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 10)) +
+  labs(title = "Covid Reports by Gender", subtitle = "(2020 Jan. to Feb. Reports)", x = "Day", y = "Number of Reports") +
+  scale_x_continuous(limits = c(0,60), breaks=seq(0,60,10))
+
+# 1.2 Number of cases by country
+
+plot_cbc <- clean_data %>% 
+  select("id","country") %>% 
+  drop_na(country) %>% 
+  group_by(country) %>% 
+  summarise(count=n(),.groups='drop') %>% 
+  slice_max(count, n=10) %>% 
+  arrange(-count)
+
+ggplot(plot_cbc) +
+  geom_col(aes(count,factor(country,levels=rev(country))),fill="#076fa2", width=0.8) +
+  geom_text(mapping = aes(x = count, y = reorder(country, count), label = count), hjust = 1.5, color = "white", size = 6, fontface="bold") +
+  theme(axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size=12),
+        axis.title.x = element_text(size=12),
+        axis.title.y = element_blank(),
+        title = element_text(size = 18, face = "bold"),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major.x = element_line(color = "#A8BAC4", size = 0.3),
+        axis.ticks.length = unit(0, "mm"),
+        axis.line.y.left = element_line(color = "black", linewidth =1)) +
+  labs(title = "Covid Reports by Country", subtitle = "(2020 Jan. to Feb. Reports)", x = "Number of Reports") +
+  scale_x_continuous(expand=c(0,0), position = "top") +
+  scale_y_discrete(expand = expansion(add = c(0, 0.5)))
+
+# 1.3 Number of cases by age group
+
+plot_cba <- clean_data %>% 
+  select("id","age") %>% 
+  drop_na(age) %>% 
+  mutate(age_group=1+age%/%10) %>% 
+  group_by(age_group) %>% 
+  summarise(count=n(),.groups='drop') %>% 
+  arrange(age_group)
+
+ggplot(plot_cba) +
+  geom_col(mapping = aes(factor(age_group,levels=rev(age_group)), count),fill="#076fa2", width=0.8) +
+  geom_text(data = subset(plot_cba, count >= 12), mapping = aes(x = reorder(age_group, count), y = count, label = count), vjust=1.4, color = "white", size = 6, fontface="bold") +
+  geom_text(data = subset(plot_cba, count < 12), mapping = aes(x = reorder(age_group, count), y = count, label = count), vjust=-0.5, color = "black", size = 6, fontface="bold") +
+  theme(axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size=12),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size=12),
+        title = element_text(size = 18, face = "bold"),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major.y = element_line(color = "#A8BAC4", size = 0.3),
+        axis.ticks.length = unit(0, "mm"),
+        axis.line.x.bottom = element_line(color = "black", linewidth =1)) +
+  labs(title = "Covid Reports by Age Group", subtitle = "(2020 Jan. to Feb. Reports)", y = "Number of Reports") +
+  scale_x_discrete(expand=c(0,0), labels=c("0-9","10-19","20-29","30-39","40-49","50-59","60-69","70-79","80-89","90-99")) +
+  scale_y_continuous(expand = expansion(add = c(0, 0.5)))
+
+
+# 2) Number of cases visiting vs local vs second hand broken up by died vs survived
+
+plot_2 <- clean_data %>% 
+  select("id","visiting.Wuhan","from.Wuhan","second_hand","died","survived") %>% 
+  mutate(outcome = case_when(died==1 ~ "Dead",died!=1 ~ "Alive",TRUE ~ NA)) %>% 
+  mutate(case = case_when(visiting.Wuhan==1 ~ 1,from.Wuhan==1 ~ 2,second_hand==1 ~ 3,TRUE ~ NA)) %>% 
+  drop_na(case,outcome) %>% 
+  select(-"died",-"survived",-"visiting.Wuhan",-"from.Wuhan",-"second_hand") %>% 
+  group_by(case,outcome) %>% 
+  summarise(count=n(),.groups='drop') %>% 
+  arrange(case)
+
+totals<-as.vector(by(plot_2$count, plot_2$case, sum))
+
+ggplot(data=plot_2,aes(x=factor(case),y=count,fill=outcome)) +
+  geom_col() +
+  geom_text(data = subset(plot_2, count >= 50), mapping = aes(y = totals,label = totals), vjust=1.5, color = "white", size = 6, fontface="bold",check_overlap=TRUE) +
+  scale_fill_manual(values=c("darkgreen","gray30")) +
+  theme(axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size=12),
+        axis.title.x = element_blank(),
+        axis.title.y = element_text(size=12),
+        title = element_text(size = 18, face = "bold"),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        panel.background = element_rect(fill = "white"),
+        panel.grid.major.y = element_line(color = "#A8BAC4", size = 0.3),
+        axis.ticks.length = unit(0, "mm"),
+        axis.line.x.bottom = element_line(color = "black", linewidth =1),
+        legend.position = "inside",
+        legend.position.inside = c(0.1,0.8),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 10)) +
+  labs(title = "Covid Report Outcomes by Case", subtitle = "(2020 Jan. to Feb. Reports)", y = "Number of Reports") +
+  scale_x_discrete(expand=c(0,0), labels=c("Visiting Wuhan","From Wuhan","Second Hand")) +
+  scale_y_continuous(expand = expansion(add = c(0, 0.5)))
+  
+
+
+pie_data <- plot_2 %>% 
+  group_by(outcome) %>% 
+  summarise(count=sum(count),.groups='drop') %>%
+  mutate(norm = count / sum(count) *100) %>%
+  mutate(ypos = norm- 0.5*norm)
+
+ggplot(data=pie_data,aes(x="",y=norm,fill=outcome)) +
+  geom_bar(stat="identity", width=1, color = "white") +
+  geom_text(aes(y = ypos, label = paste(count," (",round(count / sum(count) * 100, 1),"%)")), color = "white", size=6) +
+  scale_fill_manual(values=c("darkgreen","gray30")) +
+  coord_polar("y",start=0) +
+  theme_void() +
+  theme(title = element_text(size = 18, face = "bold"),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        legend.position = "inside",
+        legend.position.inside = c(0.1,0.8),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 10)) +
+  labs(title = "Covid Report Outcomes by Case", subtitle = "(2020 Jan. to Feb. Reports)")
+
+
+# 3) Number of cases over time (cumsum area plot)
+
+cot <- clean_data %>% 
+  select("id","reporting.date") %>% 
+  mutate(day=(as.numeric(as.Date(clean_data$reporting.date))) - 18261) %>% 
+  drop_na(reporting.date) %>% 
+  group_by(day) %>% 
+  summarise(count=n(),.groups='drop')
+
+
+# This Code block fills any discontinuities by adding zeros to missing data
+cot_ref <- data.frame(day = seq(1,59),count=rep(0,118))
+plot_cot <- rbind(cot,cot_ref)[!duplicated(rbind(cot,cot_ref)$day),] %>% 
+  arrange(day) %>% 
+  mutate(total=cumsum(count)) # combine actual data with reference data and remove duplicates
+
+cols <- c("Running Total"="seagreen4","Daily Count"="black")
+ggplot(plot_cot) +
+  geom_area(aes(x=day,y=total),fill="seagreen3") +
+  geom_line(aes(x=day,y=total,color="Running Total"), linewidth=1.5) +
+  geom_line(aes(x=day,y=count,color="Daily Count"), linewidth=1.5) +
+  scale_colour_manual(name="Legend",values=cols) +
+  theme(axis.text.x = element_text(size=12),
+        axis.text.y = element_text(size=12),
+        axis.title.x = element_text(size=12),
+        axis.title.y = element_text(size=12),
+        title = element_text(size = 18, face = "bold"),
+        plot.title = element_text(hjust = 0.5),
+        plot.subtitle = element_text(hjust = 0.5),
+        legend.position = "inside",
+        legend.position.inside = c(0.2,0.8),
+        legend.title = element_text(size = 14),
+        legend.text = element_text(size = 10)) +
+  labs(title = "Covid Reports Over Time", subtitle = "(2020 Jan. to Feb. Reports)", x = "Day", y = "Number of Reports") +
+  scale_x_continuous(limits = c(0,60), breaks=seq(0,60,10))
